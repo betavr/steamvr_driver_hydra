@@ -473,6 +473,9 @@ CHydraHmdLatest::CHydraHmdLatest( vr::IServerDriverHost * pDriverHost, int base,
 	m_bEnableIMUEmulation = settings_->GetBool("hydra", "enableIMUEmulation", false);
 	m_bEnableAngularVelocity = true;
 
+	// enableBaseMounting: allow mounting on head or other body part
+	m_bEnableBaseMounting = settings_->GetBool("hydra", "enableBaseMounting", true);
+
 	// joystickDeadzone: set joystick deadzone
 	m_fJoystickDeadzone = settings_->GetFloat("hydra", "joystickDeadzone", 0.08f);
 

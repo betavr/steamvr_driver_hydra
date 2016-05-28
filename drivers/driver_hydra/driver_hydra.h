@@ -178,6 +178,7 @@ private:
 	// Settings values
 	bool m_bEnableIMUEmulation;
 	float m_fJoystickDeadzone;
+	bool m_bEnableBaseMounting;
 
 	/*
 	//Last position for velocity & acceleration extrapolation.

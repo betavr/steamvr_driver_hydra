@@ -20,12 +20,12 @@ public:
 	CServerDriver_Hydra();
 	virtual ~CServerDriver_Hydra();
 
-	// Inherited via IServerTrackedDeviceProvider
-	virtual vr::EVRInitError Init( vr::IDriverLog * pDriverLog, vr::IServerDriverHost * pDriverHost, const char * pchUserDriverConfigDir, const char * pchDriverInstallDir ) override;
+	uint32_t GetTrackedDeviceCount();
+	vr::ITrackedDeviceServerDriver * GetTrackedDeviceDriver(uint32_t unWhich);
+	vr::ITrackedDeviceServerDriver * FindTrackedDeviceDriver(const char * pchId);
+
+	virtual vr::EVRInitError Init(vr::IVRDriverContext *pDriverContext) override;
 	virtual void Cleanup() override;
-	virtual uint32_t GetTrackedDeviceCount() override;
-	virtual vr::ITrackedDeviceServerDriver * GetTrackedDeviceDriver( uint32_t unWhich ) override;
-	virtual vr::ITrackedDeviceServerDriver * FindTrackedDeviceDriver(const char * pchId) override;
 	virtual const char * const *GetInterfaceVersions() { return vr::k_InterfaceVersions; }
 	virtual void RunFrame() override;
 
@@ -43,7 +43,7 @@ private:
 
 	void LaunchHydraMonitor( const char * pchDriverInstallDir );
 
-	vr::IServerDriverHost* m_pDriverHost;
+	vr::IVRServerDriverHost* m_pDriverHost;
 	std::string m_strDriverInstallDir;
 
 	bool m_bLaunchedHydraMonitor;
@@ -55,6 +55,7 @@ private:
 	std::vector< CHydraHmdLatest * > m_vecControllers;
 };
 
+/*
 class CClientDriver_Hydra : public vr::IClientTrackedDeviceProvider
 {
 public:
@@ -73,26 +74,21 @@ private:
 	vr::IClientDriverHost* m_pDriverHost;
 
 };
+*/
 
 class CHydraHmdLatest : public vr::ITrackedDeviceServerDriver, public vr::IVRControllerComponent
 {
 public:
-	CHydraHmdLatest( vr::IServerDriverHost * pDriverHost, int base, int n );
+	CHydraHmdLatest( vr::IVRServerDriverHost * pDriverHost, int base, int n );
 	virtual ~CHydraHmdLatest();
 
 	// Implementation of vr::ITrackedDeviceServerDriver
 	virtual vr::EVRInitError Activate( uint32_t unObjectId ) override;
 	virtual void Deactivate() override;
-	virtual void PowerOff() override;
+	virtual void EnterStandby() override;
 	void *GetComponent( const char *pchComponentNameAndVersion ) override;
 	virtual void DebugRequest( const char * pchRequest, char * pchResponseBuffer, uint32_t unResponseBufferSize ) override;
 	virtual vr::DriverPose_t GetPose() override;
-	virtual bool GetBoolTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError ) override;
-	virtual float GetFloatTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError ) override;
-	virtual int32_t GetInt32TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError ) override;
-	virtual uint64_t GetUint64TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError ) override;
-	virtual vr::HmdMatrix34_t GetMatrix34TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError *pError ) override;
-	virtual uint32_t GetStringTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, char * pchValue, uint32_t unBufferSize, vr::ETrackedPropertyError * pError ) override;
 
 	// Implementation of vr::IVRControllerComponent
 	virtual vr::VRControllerState_t GetControllerState() override;
@@ -120,7 +116,7 @@ private:
 	static const std::chrono::milliseconds k_SystemButtonChordingDelay;
 	static const std::chrono::milliseconds k_SystemButtonPulsingDuration;
 
-	typedef void ( vr::IServerDriverHost::*ButtonUpdate )( uint32_t unWhichDevice, vr::EVRButtonId eButtonId, double eventTimeOffset );
+	typedef void ( vr::IVRServerDriverHost::*ButtonUpdate )( uint32_t unWhichDevice, vr::EVRButtonId eButtonId, double eventTimeOffset );
 
 	void SendButtonUpdates( ButtonUpdate ButtonEvent, uint64_t ulMask );
 	void UpdateControllerState( sixenseControllerData & cd );
@@ -129,7 +125,7 @@ private:
 	bool WaitingForHemisphereTracking( sixenseControllerData & cd );
 
 	// Handle for calling back into vrserver with events and updates
-	vr::IServerDriverHost *m_pDriverHost;
+	vr::IVRServerDriverHost *m_pDriverHost;
 
 	// Which Hydra controller
 	int m_nBase;

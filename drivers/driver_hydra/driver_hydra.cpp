@@ -20,7 +20,6 @@
 #define HMD_DLL_EXPORT extern "C" __declspec( dllexport )
 
 CServerDriver_Hydra g_ServerTrackedDeviceProvider;
-CClientDriver_Hydra g_ClientTrackedDeviceProvider;
 
 HMD_DLL_EXPORT
 void *HmdDriverFactory( const char *pInterfaceName, int *pReturnCode )
@@ -29,10 +28,13 @@ void *HmdDriverFactory( const char *pInterfaceName, int *pReturnCode )
 	{
 		return &g_ServerTrackedDeviceProvider;
 	}
+
+	/*
 	if ( 0 == strcmp( vr::IClientTrackedDeviceProvider_Version, pInterfaceName ) )
 	{
 		return &g_ClientTrackedDeviceProvider;
 	}
+	*/
 
 	if ( pReturnCode )
 		*pReturnCode = vr::VRInitError_Init_InterfaceNotFound;
@@ -44,9 +46,9 @@ void *HmdDriverFactory( const char *pInterfaceName, int *pReturnCode )
 // Logging helpers
 //==================================================================================================
 
-static vr::IDriverLog * s_pLogFile = NULL;
+static vr::IVRDriverLog * s_pLogFile = NULL;
 
-static bool InitDriverLog( vr::IDriverLog *pDriverLog )
+static bool InitDriverLog( vr::IVRDriverLog *pDriverLog )
 {
 	if ( s_pLogFile )
 		return false;
@@ -104,11 +106,18 @@ CServerDriver_Hydra::~CServerDriver_Hydra()
 	Cleanup();
 }
 
-vr::EVRInitError CServerDriver_Hydra::Init( vr::IDriverLog * pDriverLog, vr::IServerDriverHost * pDriverHost, const char * pchUserDriverConfigDir, const char * pchDriverInstallDir )
+//vr::EVRInitError CServerDriver_Hydra::Init( vr::IDriverLog * pDriverLog, vr::IServerDriverHost * pDriverHost, const char * pchUserDriverConfigDir, const char * pchDriverInstallDir )
+vr::EVRInitError CServerDriver_Hydra::Init(vr::IVRDriverContext *pDriverContext)
 {
+	vr::EVRInitError eError = vr::VRInitError_None;
+
+	vr::IVRDriverLog *pDriverLog = (vr::IVRDriverLog *)pDriverContext->GetGenericInterface(vr::IVRDriverLog_Version, &eError);
 	InitDriverLog( pDriverLog );
-	m_pDriverHost = pDriverHost;
-	m_strDriverInstallDir = pchDriverInstallDir;
+
+	m_pDriverHost = (vr::IVRServerDriverHost *)pDriverContext->GetGenericInterface(vr::IVRServerDriverHost_Version, &eError);
+
+	//TODO: Openvr doesn't provide the driver install path anymore
+	//m_strDriverInstallDir = pchDriverInstallDir;
 
 	if ( sixenseInit() != SIXENSE_SUCCESS )
 		return vr::VRInitError_Driver_Failed;
@@ -292,7 +301,7 @@ void CServerDriver_Hydra::ScanForNewControllers( bool bNotifyServer )
 						m_vecControllers.push_back( new CHydraHmdLatest( m_pDriverHost, base, i ) );
 						if ( bNotifyServer && m_pDriverHost )
 						{
-							m_pDriverHost->TrackedDeviceAdded( m_vecControllers.back()->GetSerialNumber() );
+							m_pDriverHost->TrackedDeviceAdded( m_vecControllers.back()->GetSerialNumber(), vr::TrackedDeviceClass_Controller, m_vecControllers.back());
 						}
 					}
 				}
@@ -369,50 +378,6 @@ void CServerDriver_Hydra::LaunchHydraMonitor()
 }
 
 //==================================================================================================
-// Client Provider
-//==================================================================================================
-
-CClientDriver_Hydra::CClientDriver_Hydra()
-{
-}
-
-CClientDriver_Hydra::~CClientDriver_Hydra()
-{
-}
-
-vr::EVRInitError CClientDriver_Hydra::Init(vr::EClientDriverMode eDriverMode, vr::IDriverLog * pDriverLog, vr::IClientDriverHost * pDriverHost, const char * pchUserDriverConfigDir, const char * pchDriverInstallDir )
-{
-	InitDriverLog( pDriverLog );
-	m_pDriverHost = pDriverHost;
-	return vr::VRInitError_Init_LowPowerWatchdogNotSupported;
-}
-
-void CClientDriver_Hydra::Cleanup()
-{
-}
-
-bool CClientDriver_Hydra::BIsHmdPresent( const char * pchUserConfigDir )
-{
-	return false;
-}
-
-vr::EVRInitError CClientDriver_Hydra::SetDisplayId( const char * pchDisplayId )
-{
-	return vr::VRInitError_None;
-	//return vr::VRInitError_Driver_HmdUnknown;
-}
-
-vr::HiddenAreaMesh_t CClientDriver_Hydra::GetHiddenAreaMesh( vr::EVREye eEye )
-{
-	return vr::HiddenAreaMesh_t();
-}
-
-uint32_t CClientDriver_Hydra::GetMCImage( uint32_t * pImgWidth, uint32_t * pImgHeight, uint32_t * pChannels, void * pDataBuffer, uint32_t unBufferLen )
-{
-	return uint32_t();
-}
-
-//==================================================================================================
 // Device Driver
 //==================================================================================================
 
@@ -420,7 +385,7 @@ const std::chrono::milliseconds CHydraHmdLatest::k_SystemButtonChordingDelay( 15
 const std::chrono::milliseconds CHydraHmdLatest::k_SystemButtonPulsingDuration( 100 );
 const float CHydraHmdLatest::k_fScaleSixenseToMeters = 0.001;  // sixense driver in mm
 
-CHydraHmdLatest::CHydraHmdLatest( vr::IServerDriverHost * pDriverHost, int base, int n )
+CHydraHmdLatest::CHydraHmdLatest( vr::IVRServerDriverHost * pDriverHost, int base, int n )
 	: m_pDriverHost( pDriverHost )
 	, m_nBase( base )
 	, m_nId( n )
@@ -497,7 +462,7 @@ void CHydraHmdLatest::Deactivate()
 	m_unSteamVRTrackedDeviceId = vr::k_unTrackedDeviceIndexInvalid;
 }
 
-void CHydraHmdLatest::PowerOff()
+void CHydraHmdLatest::EnterStandby()
 {
 	// TODO FIXME Implement
 }
@@ -735,19 +700,17 @@ void CHydraHmdLatest::UpdateControllerState( sixenseControllerData & cd )
 
 	 // Developer mode
 	if (m_bEnableDeveloperMode) {
-		if (cd.buttons & SIXENSE_BUTTON_2) {
-			// Button 1+2 toggles the IMU emulation
-			if (cd.buttons & SIXENSE_BUTTON_1) {
-				if (!(m_ControllerState.ulButtonPressed & vr::ButtonMaskFromId(k_EButton_Button1)) || !(m_ControllerState.ulButtonPressed & vr::ButtonMaskFromId(k_EButton_Button2))) {
-					m_bEnableIMUEmulation = !m_bEnableIMUEmulation;
-					m_bHasUpdateHistory = false;
-				}
+		// Button 1 toggles the IMU emulation
+		if (cd.buttons & SIXENSE_BUTTON_1) {
+			if (!(m_ControllerState.ulButtonPressed & vr::ButtonMaskFromId(k_EButton_Button1))) {
+				m_bEnableIMUEmulation = !m_bEnableIMUEmulation;
+				m_bHasUpdateHistory = false;
 			}
-			// Button 2 toggles angular velocity on/off
-			else {
-				if (!(m_ControllerState.ulButtonPressed & vr::ButtonMaskFromId(k_EButton_Button2))) {
-					m_bEnableAngularVelocity = !m_bEnableAngularVelocity;
-				}
+		}
+		// Button 2 toggles angular velocity on/off
+		if (cd.buttons & SIXENSE_BUTTON_2) {
+			if (!(m_ControllerState.ulButtonPressed & vr::ButtonMaskFromId(k_EButton_Button2))) {
+				m_bEnableAngularVelocity = !m_bEnableAngularVelocity;
 			}
 		}
 	}
@@ -808,10 +771,10 @@ void CHydraHmdLatest::UpdateControllerState( sixenseControllerData & cd )
 	uint64_t ulChangedTouched = NewState.ulButtonTouched ^ m_ControllerState.ulButtonTouched;
 	uint64_t ulChangedPressed = NewState.ulButtonPressed ^ m_ControllerState.ulButtonPressed;
 
-	SendButtonUpdates( &vr::IServerDriverHost::TrackedDeviceButtonTouched, ulChangedTouched & NewState.ulButtonTouched );
-	SendButtonUpdates( &vr::IServerDriverHost::TrackedDeviceButtonPressed, ulChangedPressed & NewState.ulButtonPressed );
-	SendButtonUpdates( &vr::IServerDriverHost::TrackedDeviceButtonUnpressed, ulChangedPressed & ~NewState.ulButtonPressed );
-	SendButtonUpdates( &vr::IServerDriverHost::TrackedDeviceButtonUntouched, ulChangedTouched & ~NewState.ulButtonTouched );
+	SendButtonUpdates( &vr::IVRServerDriverHost::TrackedDeviceButtonTouched, ulChangedTouched & NewState.ulButtonTouched );
+	SendButtonUpdates( &vr::IVRServerDriverHost::TrackedDeviceButtonPressed, ulChangedPressed & NewState.ulButtonPressed );
+	SendButtonUpdates( &vr::IVRServerDriverHost::TrackedDeviceButtonUnpressed, ulChangedPressed & ~NewState.ulButtonPressed );
+	SendButtonUpdates( &vr::IVRServerDriverHost::TrackedDeviceButtonUntouched, ulChangedTouched & ~NewState.ulButtonTouched );
 
 	NewState.rAxis[1].x = cd.trigger;
 	NewState.rAxis[1].y = 0.0f;
@@ -1030,7 +993,7 @@ void CHydraHmdLatest::UpdateTrackingState( sixenseControllerData & cd )
 
 	// This call posts this pose to shared memory, where all clients will have access to it the next
 	// moment they want to predict a pose.
-	m_pDriverHost->TrackedDevicePoseUpdated( m_unSteamVRTrackedDeviceId, m_Pose );
+	m_pDriverHost->TrackedDevicePoseUpdated( m_unSteamVRTrackedDeviceId, m_Pose, sizeof(vr::DriverPose_t));
 }
 
 void CHydraHmdLatest::DelaySystemButtonForChording( sixenseControllerData & cd )

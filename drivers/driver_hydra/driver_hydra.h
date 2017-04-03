@@ -33,6 +33,7 @@ public:
 	virtual void EnterStandby() override;
 	virtual void LeaveStandby() override;
 
+	std::string m_strDriverInstallDir;
 	void LaunchHydraMonitor();
 
 private:
@@ -44,7 +45,6 @@ private:
 	void LaunchHydraMonitor( const char * pchDriverInstallDir );
 
 	vr::IVRServerDriverHost* m_pDriverHost;
-	std::string m_strDriverInstallDir;
 
 	bool m_bLaunchedHydraMonitor;
 
@@ -158,7 +158,8 @@ private:
 	unsigned short m_hardware_revision;
 
 	// Assigned by vrserver upon Activate().  The same ID visible to clients
-	uint32_t m_unSteamVRTrackedDeviceId;
+	vr::TrackedDeviceIndex_t m_unSteamVRTrackedDeviceId;
+	vr::PropertyContainerHandle_t m_ulPropertyContainer;
 
 	// The rendermodel used by the device. Check the contents of "c:\Program Files (x86)\Steam\steamapps\common\SteamVR\resources\rendermodels" for available models.
 	std::string m_strRenderModel;

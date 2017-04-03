@@ -109,15 +109,11 @@ CServerDriver_Hydra::~CServerDriver_Hydra()
 //vr::EVRInitError CServerDriver_Hydra::Init( vr::IDriverLog * pDriverLog, vr::IServerDriverHost * pDriverHost, const char * pchUserDriverConfigDir, const char * pchDriverInstallDir )
 vr::EVRInitError CServerDriver_Hydra::Init(vr::IVRDriverContext *pDriverContext)
 {
+	VR_INIT_SERVER_DRIVER_CONTEXT(pDriverContext);
+
 	vr::EVRInitError eError = vr::VRInitError_None;
 
-	vr::IVRDriverLog *pDriverLog = (vr::IVRDriverLog *)pDriverContext->GetGenericInterface(vr::IVRDriverLog_Version, &eError);
-	InitDriverLog( pDriverLog );
-
-	m_pDriverHost = (vr::IVRServerDriverHost *)pDriverContext->GetGenericInterface(vr::IVRServerDriverHost_Version, &eError);
-
-	//TODO: Openvr doesn't provide the driver install path anymore
-	//m_strDriverInstallDir = pchDriverInstallDir;
+	InitDriverLog(vr::VRDriverLog());
 
 	if ( sixenseInit() != SIXENSE_SUCCESS )
 		return vr::VRInitError_Driver_Failed;
@@ -135,7 +131,7 @@ vr::EVRInitError CServerDriver_Hydra::Init(vr::IVRDriverContext *pDriverContext)
 
 	m_Thread = new std::thread(ThreadEntry, this);   // use new operator now
 
-	return vr::VRInitError_None;
+	return eError; //vr::VRInitError_None;
 }
 
 void CServerDriver_Hydra::Cleanup()
@@ -147,6 +143,8 @@ void CServerDriver_Hydra::Cleanup()
 		m_Thread = NULL;  // force to NULL after thread join()
 		sixenseExit();
 	}
+
+	VR_CLEANUP_SERVER_DRIVER_CONTEXT();
 }
 
 uint32_t CServerDriver_Hydra::GetTrackedDeviceCount()
@@ -298,10 +296,10 @@ void CServerDriver_Hydra::ScanForNewControllers( bool bNotifyServer )
 					if ( !FindTrackedDeviceDriver( buf ) )
 					{
 						DriverLog( "added new device %s\n", buf );
-						m_vecControllers.push_back( new CHydraHmdLatest( m_pDriverHost, base, i ) );
-						if ( bNotifyServer && m_pDriverHost )
+						m_vecControllers.push_back( new CHydraHmdLatest( vr::VRServerDriverHost(), base, i ) );
+						if ( bNotifyServer && vr::VRServerDriverHost())
 						{
-							m_pDriverHost->TrackedDeviceAdded( m_vecControllers.back()->GetSerialNumber(), vr::TrackedDeviceClass_Controller, m_vecControllers.back());
+							vr::VRServerDriverHost()->TrackedDeviceAdded( m_vecControllers.back()->GetSerialNumber(), vr::TrackedDeviceClass_Controller, m_vecControllers.back());
 						}
 					}
 				}
@@ -409,24 +407,22 @@ CHydraHmdLatest::CHydraHmdLatest( vr::IVRServerDriverHost * pDriverHost, int bas
 	m_firmware_revision = cd.firmware_revision;
 	m_hardware_revision = cd.hardware_revision;
 
-	// Load config from steamvr.vrsettings
-	vr::IVRSettings *settings_;
-	settings_ = m_pDriverHost->GetSettings(vr::IVRSettings_Version);
+	// Start loading settings
 	char tmp_[32];
 
 	// renderModel: assign a rendermodel
-	settings_->GetString("hydra", "rendermodel", tmp_, sizeof(tmp_), "vr_controller_vive_1_5");
+	vr::VRSettings()->GetString("hydra", "rendermodel", tmp_, sizeof(tmp_));
 	m_strRenderModel.assign(tmp_, sizeof(tmp_));
 
 	// enable IMU emulation
-	m_bEnableIMUEmulation = settings_->GetBool("hydra", "enableimu", true);
+	m_bEnableIMUEmulation = vr::VRSettings()->GetBool("hydra", "enableimu");
 	m_bEnableAngularVelocity = true;
 
 	// set joystick deadzone
-	m_fJoystickDeadzone = settings_->GetFloat("hydra", "joystickdeadzone", 0.08f);
+	m_fJoystickDeadzone = vr::VRSettings()->GetFloat("hydra", "joystickdeadzone");
 
 	// enable developer features
-	m_bEnableDeveloperMode = settings_->GetBool("hydra", "enabledevelopermode", false);
+	m_bEnableDeveloperMode = vr::VRSettings()->GetBool("hydra", "enabledevelopermode");
 
 	// "Hold Thumbpad" mode (not user configurable)
 	m_bEnableHoldThumbpad = true;
@@ -446,11 +442,52 @@ void *CHydraHmdLatest::GetComponent( const char *pchComponentNameAndVersion )
 	return NULL;
 }
 
-vr::EVRInitError CHydraHmdLatest::Activate( uint32_t unObjectId )
+vr::EVRInitError CHydraHmdLatest::Activate( vr::TrackedDeviceIndex_t unObjectId )
 {
 	DriverLog( "CHydraHmdLatest::Activate: %s is object id %d\n", GetSerialNumber(), unObjectId );
 	m_unSteamVRTrackedDeviceId = unObjectId;
+	m_ulPropertyContainer = vr::VRProperties()->TrackedDeviceToPropertyContainer(unObjectId);
 
+	// properties
+	vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, vr::Prop_CurrentUniverseId_Uint64, vr::TrackedProp_ValueNotProvidedByDevice);
+	vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, vr::Prop_PreviousUniverseId_Uint64, vr::TrackedProp_ValueNotProvidedByDevice);
+
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_DeviceClass_Int32, vr::TrackedDeviceClass_Controller);
+
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis0Type_Int32, vr::k_eControllerAxis_TrackPad);
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis1Type_Int32, vr::k_eControllerAxis_Trigger);
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis2Type_Int32, vr::TrackedProp_ValueNotProvidedByDevice);
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis3Type_Int32, vr::TrackedProp_ValueNotProvidedByDevice);
+	vr::VRProperties()->SetInt32Property(m_ulPropertyContainer, vr::Prop_Axis4Type_Int32, vr::TrackedProp_ValueNotProvidedByDevice);
+
+	uint64_t buttonmask =
+		vr::ButtonMaskFromId(vr::k_EButton_System) |
+		vr::ButtonMaskFromId(vr::k_EButton_Axis0) |
+		vr::ButtonMaskFromId(vr::k_EButton_Axis1) |
+		vr::ButtonMaskFromId(k_EButton_Button1) |
+		vr::ButtonMaskFromId(k_EButton_Button2) |
+		vr::ButtonMaskFromId(k_EButton_Button3) |
+		vr::ButtonMaskFromId(k_EButton_Button4) |
+		vr::ButtonMaskFromId(k_EButton_Bumper);
+	vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, vr::Prop_SupportedButtons_Uint64, buttonmask);
+
+	vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, vr::Prop_HardwareRevision_Uint64, m_hardware_revision);
+	vr::VRProperties()->SetUint64Property(m_ulPropertyContainer, vr::Prop_FirmwareVersion_Uint64, m_firmware_revision);
+	
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_SerialNumber_String, m_strSerialNumber.c_str());
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_RenderModelName_String, m_strRenderModel.c_str());
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_ManufacturerName_String, "Razer");
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_ModelNumber_String, "Hydra");
+
+	std::string firmware_revision = "cd.firmware_revision=";
+	firmware_revision = firmware_revision + std::to_string(m_firmware_revision);
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_TrackingFirmwareVersion_String, firmware_revision.c_str());
+
+	std::string hardware_revision = "cd.hardware_revision=";
+	hardware_revision = hardware_revision + std::to_string(m_hardware_revision);
+	vr::VRProperties()->SetStringProperty(m_ulPropertyContainer, vr::Prop_HardwareRevision_String, hardware_revision.c_str());
+
+	g_ServerTrackedDeviceProvider.m_strDriverInstallDir = vr::VRProperties()->GetStringProperty(m_ulPropertyContainer, vr::Prop_InstallPath_String);
 	g_ServerTrackedDeviceProvider.LaunchHydraMonitor();
 
 	return vr::VRInitError_None;
@@ -506,153 +543,13 @@ vr::DriverPose_t CHydraHmdLatest::GetPose()
 	return m_Pose;
 }
 
-bool CHydraHmdLatest::GetBoolTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError )
-{
-	*pError = vr::TrackedProp_ValueNotProvidedByDevice;
-	return false;
-}
-
-float CHydraHmdLatest::GetFloatTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError )
-{
-	*pError = vr::TrackedProp_ValueNotProvidedByDevice;
-	return 0.0f;
-}
-
-int32_t CHydraHmdLatest::GetInt32TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError )
-{
-	int32_t nRetVal = 0;
-	vr::ETrackedPropertyError error = vr::TrackedProp_UnknownProperty;
-	switch ( prop )
-	{
-	case vr::Prop_DeviceClass_Int32:
-		nRetVal = vr::TrackedDeviceClass_Controller;
-		error = vr::TrackedProp_Success;
-		break;
-
-	case vr::Prop_Axis0Type_Int32:
-		// We are reporting a "trackpad" type axis for better compatibility with Vive games
-		nRetVal = vr::k_eControllerAxis_TrackPad;
-		error = vr::TrackedProp_Success;
-		break;
-
-	case vr::Prop_Axis1Type_Int32:
-		nRetVal = vr::k_eControllerAxis_Trigger;
-		error = vr::TrackedProp_Success;
-		break;
-
-	case vr::Prop_Axis2Type_Int32:
-	case vr::Prop_Axis3Type_Int32:
-	case vr::Prop_Axis4Type_Int32:
-		error = vr::TrackedProp_ValueNotProvidedByDevice;
-		break;
-	}
-
-	*pError = error;
-	return nRetVal;
-}
-
-uint64_t CHydraHmdLatest::GetUint64TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError )
-{
-	uint64_t ulRetVal = 0;
-	vr::ETrackedPropertyError error = vr::TrackedProp_ValueNotProvidedByDevice;
-
-	switch ( prop )
-	{
-	case vr::Prop_CurrentUniverseId_Uint64:
-	case vr::Prop_PreviousUniverseId_Uint64:
-		error = vr::TrackedProp_ValueNotProvidedByDevice;
-		break;
-
-	case vr::Prop_SupportedButtons_Uint64:
-		ulRetVal = 
-			vr::ButtonMaskFromId( vr::k_EButton_System ) |
-			vr::ButtonMaskFromId( vr::k_EButton_Axis0 ) |
-			vr::ButtonMaskFromId( vr::k_EButton_Axis1 ) |
-			vr::ButtonMaskFromId( k_EButton_Button1 ) |
-			vr::ButtonMaskFromId( k_EButton_Button2 ) |
-			vr::ButtonMaskFromId( k_EButton_Button3 ) |
-			vr::ButtonMaskFromId( k_EButton_Button4 ) |
-			vr::ButtonMaskFromId( k_EButton_Bumper );
-		error = vr::TrackedProp_Success;
-		break;
-
-	case vr::Prop_HardwareRevision_Uint64:
-		ulRetVal = m_hardware_revision;
-		error = vr::TrackedProp_Success;
-		break;
-
-	case vr::Prop_FirmwareVersion_Uint64:
-		ulRetVal = m_firmware_revision;
-		error = vr::TrackedProp_Success;
-		break;
-
-	}
-
-	*pError = error;
-	return ulRetVal;
-}
-
+/*
+//TODO?
 vr::HmdMatrix34_t CHydraHmdLatest::GetMatrix34TrackedDeviceProperty( vr::ETrackedDeviceProperty prop, vr::ETrackedPropertyError * pError )
 {
 	return vr::HmdMatrix34_t();
 }
-
-uint32_t CHydraHmdLatest::GetStringTrackedDeviceProperty( vr::ETrackedDeviceProperty prop, char * pchValue, uint32_t unBufferSize, vr::ETrackedPropertyError * pError )
-{
-	std::ostringstream ssRetVal;
-
-
-	switch ( prop )
-	{
-	case vr::Prop_SerialNumber_String:
-		ssRetVal << m_strSerialNumber;
-		break;
-
-	case vr::Prop_RenderModelName_String:
-		// The {hydra} syntax lets us refer to rendermodels that are installed
-		// in the driver's own resources/rendermodels directory.  The driver can
-		// still refer to SteamVR models like "generic_hmd".
-		//ssRetVal << "{hydra}hydra_controller";
-
-		// We return the user configured rendermodel here. Defaults to "{hydra}hydra_controller".
-		ssRetVal << m_strRenderModel.c_str();
-		break;
-
-	case vr::Prop_ManufacturerName_String:
-		ssRetVal << "Razer";
-		break;
-
-	case vr::Prop_ModelNumber_String:
-		ssRetVal << "Hydra";
-		break;
-
-	case vr::Prop_TrackingFirmwareVersion_String:
-		ssRetVal << "cd.firmware_revision=" << m_firmware_revision;
-		break;
-
-	case vr::Prop_HardwareRevision_String:
-		ssRetVal << "cd.hardware_revision=" << m_hardware_revision;
-		break;
-	}
-
-	std::string sRetVal = ssRetVal.str();
-	if ( sRetVal.empty() )
-	{
-		*pError = vr::TrackedProp_ValueNotProvidedByDevice;
-		return 0;
-	}
-	else if ( sRetVal.size() + 1 > unBufferSize )
-	{
-		*pError = vr::TrackedProp_BufferTooSmall;
-		return sRetVal.size() + 1;  // caller needs to know how to size buffer
-	}
-	else
-	{
-		_snprintf( pchValue, unBufferSize, sRetVal.c_str() );
-		*pError = vr::TrackedProp_Success;
-		return sRetVal.size() + 1;
-	}
-}
+*/
 
 vr::VRControllerState_t CHydraHmdLatest::GetControllerState()
 {
@@ -686,7 +583,7 @@ void CHydraHmdLatest::SendButtonUpdates( ButtonUpdate ButtonEvent, uint64_t ulMa
 
 		if ( bit & ulMask )
 		{
-			( m_pDriverHost->*ButtonEvent )( m_unSteamVRTrackedDeviceId, button, 0.0 );
+			( vr::VRServerDriverHost()->*ButtonEvent )( m_unSteamVRTrackedDeviceId, button, 0.0 );
 		}
 	}
 }
@@ -780,9 +677,9 @@ void CHydraHmdLatest::UpdateControllerState( sixenseControllerData & cd )
 	NewState.rAxis[1].y = 0.0f;
 
 	if ( NewState.rAxis[0].x != m_ControllerState.rAxis[0].x || NewState.rAxis[0].y != m_ControllerState.rAxis[0].y )
-		m_pDriverHost->TrackedDeviceAxisUpdated( m_unSteamVRTrackedDeviceId, 0, NewState.rAxis[0] );
+		vr::VRServerDriverHost()->TrackedDeviceAxisUpdated( m_unSteamVRTrackedDeviceId, 0, NewState.rAxis[0] );
 	if ( NewState.rAxis[1].x != m_ControllerState.rAxis[1].x )
-		m_pDriverHost->TrackedDeviceAxisUpdated( m_unSteamVRTrackedDeviceId, 1, NewState.rAxis[1] );
+		vr::VRServerDriverHost()->TrackedDeviceAxisUpdated( m_unSteamVRTrackedDeviceId, 1, NewState.rAxis[1] );
 
 	m_ControllerState = NewState;
 }
@@ -993,7 +890,7 @@ void CHydraHmdLatest::UpdateTrackingState( sixenseControllerData & cd )
 
 	// This call posts this pose to shared memory, where all clients will have access to it the next
 	// moment they want to predict a pose.
-	m_pDriverHost->TrackedDevicePoseUpdated( m_unSteamVRTrackedDeviceId, m_Pose, sizeof(vr::DriverPose_t));
+	vr::VRServerDriverHost()->TrackedDevicePoseUpdated( m_unSteamVRTrackedDeviceId, m_Pose, sizeof(vr::DriverPose_t));
 }
 
 void CHydraHmdLatest::DelaySystemButtonForChording( sixenseControllerData & cd )
@@ -1154,7 +1051,7 @@ void CHydraHmdLatest::RealignCoordinates( CHydraHmdLatest * pHydraA, CHydraHmdLa
 
 	// Ask hydra_monitor to tell us HMD pose
 	static vr::VREvent_Data_t nodata = { 0 };
-	pHydraA->m_pDriverHost->VendorSpecificEvent( pHydraA->m_unSteamVRTrackedDeviceId,
+	vr::VRServerDriverHost()->VendorSpecificEvent( pHydraA->m_unSteamVRTrackedDeviceId,
 		(vr::EVREventType) (vr::VREvent_VendorSpecific_Reserved_Start + 0), nodata,
 		-std::chrono::duration_cast<std::chrono::seconds>( k_SystemButtonChordingDelay ).count() );
 }

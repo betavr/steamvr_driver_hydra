@@ -77,7 +77,7 @@
                   }
                },
                "mode" : "button",
-               "path" : "/user/hand/left/input/button3"
+               "path" : "/user/hand/left/input/application_menu"
             },
             {
                "inputs" : {
@@ -86,7 +86,7 @@
                   }
                },
                "mode" : "button",
-               "path" : "/user/hand/right/input/button4"
+               "path" : "/user/hand/right/input/application_menu"
             },
             {
                "inputs" : {
@@ -100,8 +100,8 @@
                      "output" : "/actions/legacy/in/left_axis0_touch"
                   }
                },
-               "mode" : "joystick",
-               "path" : "/user/hand/left/input/joystick"
+               "mode" : "trackpad",
+               "path" : "/user/hand/left/input/trackpad"
             },
             {
                "inputs" : {
@@ -115,8 +115,8 @@
                      "output" : "/actions/legacy/in/right_axis0_touch"
                   }
                },
-               "mode" : "joystick",
-               "path" : "/user/hand/right/input/joystick"
+               "mode" : "trackpad",
+               "path" : "/user/hand/right/input/trackpad"
             },
             {
                "inputs" : {
@@ -157,7 +157,7 @@
          ]
       }
    },
-   "controller_type" : "razer_hydra",
-   "description" : "Razer Hydra",
-   "name" : "Default bindings for legacy applications for Razer Hydra Controllers"
+   "controller_type" : "vive_controller",
+   "description" : "",
+   "name" : "Default bindings for legacy applications for Vive Controllers"
 }

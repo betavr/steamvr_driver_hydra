@@ -1,101 +1,94 @@
 {
   "jsonid" : "input_profile",
-  "controller_type": "razer_hydra",
-  "legacy_profile": "none",
-  "legacy_binding" :  "{hydra}/input/legacy_bindings_hydra.json",
+  "controller_type": "vive_controller",
+  "device_class" : "TrackedDeviceClass_Controller",
+  "resource_root" : "htc",
+  "driver_name" : "lighthouse",
+  "legacy_binding" :  "{htc}/input/legacy_bindings_vive_controller.json",
   "input_bindingui_mode" : "controller_handed",
+  "should_show_binding_errors" :  true,
   "input_bindingui_left" :
   {
     "transform" : "scale(-1,1)",
-    "image": "{hydra}/icons/vive_wand.svg"
+    "image": "{htc}/icons/vive_wand.svg"
   },
   "input_bindingui_right" :
   {
-    "image": "{hydra}/icons/vive_wand.svg"
+    "image": "{htc}/icons/vive_wand.svg"
   },
-    "input_source": {
-        "/input/trigger": {
-            "type": "trigger",
-            "binding_image_point": [ 41, 64 ],
-            "order": 1
-        },
-        "/input/grip": {
-            "type": "button",
-            "binding_image_point": [ 52, 87 ],
-            "order": 2
-        },
-        "/input/joystick": {
-            "type": "joystick",
-            "binding_image_point": [ 66, 59 ],
-            "order": 3
-        },
-        "/input/button1": {
-            "type": "button",
-            "binding_image_point": [ 64, 35 ],
-            "order": 6
-        },
-        "/input/button2": {
-            "type": "button",
-            "binding_image_point": [ 64, 35 ],
-            "order": 7
-        },
-        "/input/button3": {
-            "type": "button",
-            "binding_image_point": [ 64, 35 ],
-            "order": 4
-        },
-        "/input/button4": {
-            "type": "button",
-            "binding_image_point": [ 64, 35 ],
-            "order": 5
-        },
-        "/input/system": {
-            "type": "button",
-            "binding_image_point": [ 67, 81 ],
-            "order": 8
-        },
-        "/input/skeleton/right": {
-            "type": "skeleton",
-            "side": "right",
-            "skeleton": "/skeleton/hand/right",
-            "binding_image_point": [ 62, 16 ]
-        },
-        "/input/skeleton/left": {
-            "type": "skeleton",
-            "side": "left",
-            "skeleton": "/skeleton/hand/left",
-            "binding_image_point": [ 62, 16 ]
-        },
-        "/pose/raw": {
-            "type": "pose",
-            "binding_image_point": [ 62, 16 ]
-        },
-        "/pose/base": {
-            "type": "pose",
-            "binding_image_point": [ 65, 150 ]
-        },
-        "/pose/handgrip": {
-            "type": "pose",
-            "binding_image_point": [ 52, 86 ]
-        },
-        "/pose/tip": {
-            "type": "pose",
-            "binding_image_point": [ 62, 16 ]
-        },
-        "/pose/gdc2015": {
-            "type": "pose",
-            "binding_image_point": [ 62, 16 ]
-        },
-        "/output/haptic": {
-            "type": "vibration",
-            "binding_image_point": [ 66, 59 ]
-        }
+  "input_source" :
+  {
+    "/input/trackpad" : { 
+        "type" : "trackpad",
+	"click" : true,
+	"touch" : true,
+        "binding_image_point" : [ 66, 59 ],
+        "order" : 2
     },
-    "default_bindings": 
-    [
-        {
-            "app_key": "openvr.component.vrcompositor",
-            "binding_url": "vrcompositor_bindings_hydra.json"
-        }
-    ]
+    "/input/trigger" : {
+        "type" : "trigger",
+	"click" : true,
+	"value" : true,
+        "binding_image_point" : [ 41, 64 ],
+        "order" : 1
+    },
+    "/input/grip" : {
+        "type" : "button",
+	"click" : true,
+        "binding_image_point" : [ 52, 87 ],
+        "order" : 3
+    },
+    "/input/application_menu" : {
+        "type" : "button",
+	"click" : true,
+        "binding_image_point" : [ 64, 35 ],
+        "order" : 4
+    },
+    "/input/system" : {
+        "type" : "button",
+	"click" : true,
+        "binding_image_point" : [ 67, 81 ],
+        "order" : 5
+    },
+    "/input/skeleton/right" : {
+        "type" : "skeleton",
+	"side" : "right",
+	"skeleton" : "/skeleton/hand/right",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/input/skeleton/left" : {
+        "type" : "skeleton",
+	"side" : "left",
+	"skeleton" : "/skeleton/hand/left",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/pose/raw" : {
+        "type" : "pose",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/pose/base" : {
+        "type" : "pose",
+        "binding_image_point" : [ 65, 150 ]
+    },
+    "/pose/handgrip" : {
+        "type" : "pose",
+        "binding_image_point" : [ 52, 86 ]
+    },
+    "/pose/tip" : {
+        "type" : "pose",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/pose/front" : {
+        "type" : "pose",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/pose/gdc2015" : {
+        "type" : "pose",
+        "binding_image_point" : [ 62, 16 ]
+    },
+    "/output/haptic" : {
+        "type" : "vibration",
+        "binding_image_point" : [ 66, 59 ]
+    }
+  }
 }

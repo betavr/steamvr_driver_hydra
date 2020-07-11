@@ -387,7 +387,7 @@ public:
         vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/button1/click", &m_compButton1);
         vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/button2/click", &m_compButton2);
         vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/button3/click", &m_compButton3);
-        vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/button4/click", &m_compButton4);
+        vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/application_menu/click", &m_compButton4);
         //vr::VRDriverInput()->CreateBooleanComponent(m_ulPropertyContainer, "/input/trigger/click", &m_compTriggerButtonEmulated);
         vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trigger/value", &m_compTrigger, VRScalarType_Absolute, VRScalarUnits_NormalizedOneSided);
         vr::VRDriverInput()->CreateScalarComponent(m_ulPropertyContainer, "/input/trackpad/x", &m_compJoystickAxisX, VRScalarType_Absolute, VRScalarUnits_NormalizedTwoSided);
